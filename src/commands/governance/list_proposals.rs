@@ -1,3 +1,4 @@
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
 use crate::lib::nns_types::governance::{
     governance_canister_id, ProposalRewardStatus, ProposalStatus, Topic,
@@ -6,7 +7,6 @@ use ic_nns_governance::pb::v1::{ListProposalInfo, ListProposalInfoResponse};
 
 use candid::{CandidType, Decode, Encode};
 use clap::Clap;
-use ic_agent::Agent;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
@@ -42,7 +42,7 @@ pub struct ListPropsalOpts {
     include_status: Option<Vec<String>>,
 }
 
-pub async fn exec(opts: ListPropsalOpts, agent: Agent) -> NnsCliResult {
+pub async fn exec(opts: ListPropsalOpts, env: Env) -> NnsCliResult {
     let include_reward_status: Vec<i32> = match opts.include_reward_status {
         Some(vec) => vec
             .iter()
@@ -80,7 +80,8 @@ pub async fn exec(opts: ListPropsalOpts, agent: Agent) -> NnsCliResult {
         limit,
     };
 
-    let result = agent
+    let result = env
+        .agent
         .query(&governance_canister_id(), LIST_PROPOSALS_METHOD)
         .with_arg(Encode!(&proposal_info)?)
         .call()

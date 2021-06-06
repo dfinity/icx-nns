@@ -19,7 +19,7 @@ fn get_hsm_pin() -> Result<String, String> {
     expect_env_var(HSM_PIN)
 }
 
-async fn create_basic_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
+fn create_basic_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
     let id = match std::env::var(PEM_PATH) {
         Ok(_) => {
             let path = expect_env_var(PEM_PATH).map_err(|err| anyhow!("{}", err))?;
@@ -30,7 +30,7 @@ async fn create_basic_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>
     Ok(Box::new(id))
 }
 
-async fn create_hsm_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
+fn create_hsm_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
     if std::env::var(HSM_PKCS11_LIBRARY_PATH).is_err() {
         return Err(anyhow!(
             "HSM_PKCS11_LIBRARY_PATH environment variable is not set."
@@ -47,10 +47,10 @@ async fn create_hsm_identity() -> NnsCliResult<Box<dyn Identity + Send + Sync>> 
     Ok(Box::new(id))
 }
 
-pub async fn create_identity(use_hsm: bool) -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
+pub fn create_identity(use_hsm: bool) -> NnsCliResult<Box<dyn Identity + Send + Sync>> {
     if use_hsm {
-        create_hsm_identity().await
+        create_hsm_identity()
     } else {
-        create_basic_identity().await
+        create_basic_identity()
     }
 }

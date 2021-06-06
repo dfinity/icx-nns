@@ -1,12 +1,8 @@
 use crate::lib::error::NnsCliResult;
-use crate::lib::identity::create_identity;
 
 use anyhow::anyhow;
 use garcon::Delay;
-use ic_agent::export::Principal;
-use ic_agent::Agent;
-
-const IC_ENDPOINT: &str = "https://ic0.app";
+use ic_agent::{Agent, Identity};
 
 pub fn create_waiter() -> Delay {
     Delay::builder()
@@ -14,25 +10,18 @@ pub fn create_waiter() -> Delay {
         .build()
 }
 
-/// Constructs an `Agent` to be used for submitting requests.
 pub async fn construct_agent(
-    endpoint: Option<String>,
-    use_hsm: bool,
-) -> NnsCliResult<(Agent, Principal)> {
-    let (url_str, fetch_root_key) = match endpoint {
-        Some(endpoint) => (format!("http://{}", endpoint), true),
-        None => (IC_ENDPOINT.to_string(), false),
-    };
-
-    let identity = create_identity(use_hsm).await?;
-    let sender = identity.sender().map_err(|err| anyhow!("{}", err))?;
+    identity: Box<dyn Identity + Send + Sync>,
+    endpoint: String,
+    fetch_root_key: bool,
+) -> NnsCliResult<Agent> {
     let agent = Agent::builder()
-        .with_url(url_str)
+        .with_url(endpoint)
         .with_boxed_identity(identity)
         .build()
         .map_err(|err| anyhow!("{:?}", err.to_string()))?;
     if fetch_root_key {
         let _ = agent.fetch_root_key().await?;
     }
-    Ok((agent, sender))
+    Ok(agent)
 }

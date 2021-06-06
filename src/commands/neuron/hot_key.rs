@@ -1,11 +1,12 @@
 use crate::lib::agent::create_waiter;
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
 use crate::lib::nns_types::governance::governance_canister_id;
+use crate::lib::segregated_sign_send::sign::{sign_message, CanisterPayload, SignPayload};
 
 use anyhow::anyhow;
 use candid::{Decode, Encode};
 use clap::Clap;
-use ic_agent::Agent;
 use ic_base_types::PrincipalId;
 use ic_nns_common::pb::v1::NeuronId as NeuronIdProto;
 use ic_nns_common::types::NeuronId;
@@ -57,7 +58,12 @@ fn get_command(operation: String, hot_key: Principal) -> NnsCliResult<Command> {
     }
 }
 
-pub async fn exec(opts: HotKeyOpts, id: u64, agent: Agent) -> NnsCliResult {
+pub async fn exec(
+    opts: HotKeyOpts,
+    id: u64,
+    maybe_sign_payload: Option<SignPayload>,
+    env: Env,
+) -> NnsCliResult {
     let command = get_command(opts.operation, opts.hot_key)?;
     let id = NeuronId(id);
 
@@ -65,21 +71,37 @@ pub async fn exec(opts: HotKeyOpts, id: u64, agent: Agent) -> NnsCliResult {
         id: Some(NeuronIdProto::from(id)),
         command: Some(command),
     };
+    let arg = Encode!(&manage_neuron)?;
 
-    let result = agent
-        .update(&governance_canister_id(), MANAGE_NEURON_METHOD)
-        .with_arg(Encode!(&manage_neuron)?)
-        .call_and_wait(create_waiter())
-        .await?;
-    let manage_neuron_response = Decode!(&result, ManageNeuronResponse)?;
+    match maybe_sign_payload {
+        Some(payload) => {
+            let mut sign_payload = payload;
+            sign_payload.payload = Some(CanisterPayload {
+                canister_id: governance_canister_id(),
+                method_name: MANAGE_NEURON_METHOD.to_string(),
+                is_query: false,
+                arg,
+            });
+            sign_message(sign_payload, env.agent, env.sender).await?;
+        }
+        None => {
+            let result = env
+                .agent
+                .update(&governance_canister_id(), MANAGE_NEURON_METHOD)
+                .with_arg(arg)
+                .call_and_wait(create_waiter())
+                .await?;
+            let manage_neuron_response = Decode!(&result, ManageNeuronResponse)?;
 
-    match manage_neuron_response.command {
-        Some(Error(gov_err)) => println!("{}", gov_err),
-        Some(ic_nns_governance::pb::v1::manage_neuron_response::Command::Configure(
-            ic_nns_governance::pb::v1::manage_neuron_response::ConfigureResponse {},
-        )) => eprintln!("Configured succesfully."),
-        _ => eprintln!("Received an invalid response."),
-    };
+            match manage_neuron_response.command {
+                Some(Error(gov_err)) => println!("{}", gov_err),
+                Some(ic_nns_governance::pb::v1::manage_neuron_response::Command::Configure(
+                    ic_nns_governance::pb::v1::manage_neuron_response::ConfigureResponse {},
+                )) => eprintln!("Configured succesfully."),
+                _ => eprintln!("Received an invalid response."),
+            };
+        }
+    }
 
     NnsCliResult::Ok(())
 }

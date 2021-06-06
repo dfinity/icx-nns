@@ -5,27 +5,23 @@ use crate::lib::nns_types::governance::{governance_canister_id, ledger_canister_
 use crate::lib::nns_types::utils::{
     get_governance_subaccount, get_icpts_from_args, icpts_amount_validator, icpts_from_str,
 };
-use crate::lib::segregated_sign_send::sign::SignPayload;
+use crate::lib::segregated_sign_send::sign::{sign_message, CanisterPayload, SignPayload};
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use candid::{Decode, Encode};
 use clap::Clap;
-use ic_agent::Agent;
-use ic_base_types::{CanisterId, PrincipalId};
-use ic_nns_common::pb::v1::NeuronId;
+use ic_base_types::PrincipalId;
 use ic_types::Principal;
 use ledger_canister::{
-    AccountIdentifier, BlockHeight, ICPTs, Memo, NotifyCanisterArgs, SendArgs, Subaccount,
-    TRANSACTION_FEE,
+    AccountIdentifier, BlockHeight, ICPTs, Memo, SendArgs, Subaccount, TRANSACTION_FEE,
 };
 use std::convert::TryFrom;
 
 const SEND_METHOD: &str = "send_dfx";
-const NOTIFY_METHOD: &str = "notify_dfx";
 
 /// Stake a new neuron or refresh an existing neuron
 #[derive(Clap)]
-pub struct StakeRefreshNeuronOpts {
+pub struct StakeRefreshNeuronSendOpts {
     /// Specify the controller of the neuron
     controller: String,
 
@@ -52,22 +48,17 @@ pub struct StakeRefreshNeuronOpts {
     /// Transaction fee, default is 10000 e8s.
     #[clap(long, validator(icpts_amount_validator))]
     fee: Option<String>,
-
-    /// Max fee, default is 10000 e8s.
-    #[clap(long, validator(icpts_amount_validator))]
-    max_fee: Option<String>,
 }
 
-async fn send_and_notify(
-    agent: Agent,
+async fn send(
+    env: Env,
     memo: Memo,
     amount: ICPTs,
     fee: ICPTs,
     to_subaccount: Option<Subaccount>,
-    max_fee: ICPTs,
-) -> NnsCliResult<NeuronId> {
+    maybe_sign_payload: Option<SignPayload>,
+) -> NnsCliResult<()> {
     let ledger_canister_id = ledger_canister_id();
-
     let governance_canister_id = governance_canister_id();
 
     let gov_base_types_principal = PrincipalId::try_from(governance_canister_id.clone().as_slice())
@@ -75,47 +66,47 @@ async fn send_and_notify(
 
     let to = AccountIdentifier::new(gov_base_types_principal, to_subaccount);
 
-    let result = agent
-        .update(&ledger_canister_id, SEND_METHOD)
-        .with_arg(Encode!(&SendArgs {
-            memo,
-            amount,
-            fee,
-            from_subaccount: None,
-            to,
-            created_at_time: None,
-        })?)
-        .call_and_wait(create_waiter())
-        .await?;
+    let arg = Encode!(&SendArgs {
+        memo,
+        amount,
+        fee,
+        from_subaccount: None,
+        to,
+        created_at_time: None,
+    })?;
 
-    let block_height = Decode!(&result, BlockHeight)?;
-    println!("Transfer sent at BlockHeight: {}", block_height);
+    match maybe_sign_payload {
+        Some(payload) => {
+            let mut sign_payload = payload;
+            sign_payload.payload = Some(CanisterPayload {
+                canister_id: ledger_canister_id,
+                method_name: SEND_METHOD.to_string(),
+                is_query: false,
+                arg,
+            });
+            sign_message(sign_payload, env.agent, env.sender).await?;
+        }
+        None => {
+            let result = env
+                .agent
+                .update(&ledger_canister_id, SEND_METHOD)
+                .with_arg(arg)
+                .call_and_wait(create_waiter())
+                .await?;
 
-    let result = agent
-        .update(&ledger_canister_id, NOTIFY_METHOD)
-        .with_arg(Encode!(&NotifyCanisterArgs {
-            block_height,
-            max_fee,
-            from_subaccount: None,
-            to_canister: CanisterId::try_from(gov_base_types_principal)
-                .map_err(|err| anyhow!(err))?,
-            to_subaccount,
-        })?)
-        .call_and_wait(create_waiter())
-        .await?;
+            let block_height = Decode!(&result, BlockHeight)?;
+            println!("Transfer sent at BlockHeight: {}", block_height);
+        }
+    }
 
-    let result = Decode!(&result, NeuronId)?;
-    Ok(result)
+    Ok(())
 }
 
 pub async fn exec(
-    opts: StakeRefreshNeuronOpts,
+    opts: StakeRefreshNeuronSendOpts,
     maybe_sign_payload: Option<SignPayload>,
     env: Env,
 ) -> NnsCliResult {
-    if maybe_sign_payload.is_some() {
-        bail!("The `--sign` flag isn't valid for this command since it calls the ledger canister's send_dfx and notify_dfx sequentially. Please use `icx-nns --sign neuron stake-or-refresh-send` then `icx-nns --sign neuron stake-or-refresh-notify` instead.");
-    }
     let amount = get_icpts_from_args(opts.amount, opts.icp, opts.e8s)?;
 
     let fee = opts
@@ -133,12 +124,7 @@ pub async fn exec(
 
     let to_subaccount = Some(gov_subaccount);
 
-    let max_fee = opts
-        .max_fee
-        .map_or(Ok(TRANSACTION_FEE), |v| icpts_from_str(&v))
-        .map_err(|err| anyhow!(err))?;
+    send(env, memo, amount, fee, to_subaccount, maybe_sign_payload).await?;
 
-    let result = send_and_notify(env.agent, memo, amount, fee, to_subaccount, max_fee).await?;
-    println!("Neuron id: {:?}", result);
     Ok(())
 }

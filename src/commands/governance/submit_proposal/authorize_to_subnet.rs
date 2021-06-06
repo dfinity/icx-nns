@@ -1,10 +1,11 @@
 use crate::lib::agent::create_waiter;
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
 use crate::lib::nns_types::governance::governance_canister_id;
+use crate::lib::segregated_sign_send::sign::{sign_message, CanisterPayload, SignPayload};
 
 use candid::{CandidType, Decode, Encode};
 use clap::Clap;
-use ic_agent::Agent;
 use ic_nns_common::pb::v1::NeuronId as NeuronIdProto;
 use ic_nns_common::types::NeuronId;
 use ic_nns_governance::pb::v1::manage_neuron_response::Command::{Error, MakeProposal};
@@ -38,7 +39,8 @@ pub struct AuthToSubnetOpts {
 pub async fn exec(
     opts: AuthToSubnetOpts,
     proposal_opts: super::SubmitProposalOpts,
-    agent: Agent,
+    maybe_sign_payload: Option<SignPayload>,
+    env: Env,
 ) -> NnsCliResult {
     #[derive(CandidType)]
     struct SetAuthorizedSubnetworkListArgs {
@@ -65,20 +67,39 @@ pub async fn exec(
         command: Some(Command::MakeProposal(Box::<Proposal>::new(proposal))),
     };
 
-    let result = agent
-        .update(&governance_canister_id(), MANAGE_NEURON_METHOD)
-        .with_arg(Encode!(&manage_neuron)?)
-        .call_and_wait(create_waiter())
-        .await?;
-    let manage_neuron_response = Decode!(&result, ManageNeuronResponse)?;
+    let arg = Encode!(&manage_neuron)?;
 
-    match manage_neuron_response.command {
-        Some(Error(gov_err)) => println!("{}", gov_err),
-        Some(MakeProposal(response)) => match response.proposal_id {
-            Some(proposal_id) => println!("{:?}", proposal_id),
-            None => eprintln!("Propsal sent but did not receive a proposal id in response."),
-        },
-        _ => eprintln!("Received an invalid response."),
+    match maybe_sign_payload {
+        Some(payload) => {
+            let mut sign_payload = payload;
+            sign_payload.payload = Some(CanisterPayload {
+                canister_id: governance_canister_id(),
+                method_name: MANAGE_NEURON_METHOD.to_string(),
+                is_query: false,
+                arg,
+            });
+            sign_message(sign_payload, env.agent, env.sender).await?;
+        }
+        None => {
+            let result = env
+                .agent
+                .update(&governance_canister_id(), MANAGE_NEURON_METHOD)
+                .with_arg(arg)
+                .call_and_wait(create_waiter())
+                .await?;
+            let manage_neuron_response = Decode!(&result, ManageNeuronResponse)?;
+
+            match manage_neuron_response.command {
+                Some(Error(gov_err)) => println!("{}", gov_err),
+                Some(MakeProposal(response)) => match response.proposal_id {
+                    Some(proposal_id) => println!("{:?}", proposal_id),
+                    None => {
+                        eprintln!("Propsal sent but did not receive a proposal id in response.")
+                    }
+                },
+                _ => eprintln!("Received an invalid response."),
+            };
+        }
     };
 
     NnsCliResult::Ok(())
