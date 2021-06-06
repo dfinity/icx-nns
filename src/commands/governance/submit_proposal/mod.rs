@@ -1,7 +1,8 @@
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
+use crate::lib::segregated_sign_send::sign::SignPayload;
 
 use clap::Clap;
-use ic_agent::Agent;
 
 mod authorize_to_subnet;
 mod motion;
@@ -31,12 +32,16 @@ enum SubCommand {
     Motion(motion::MotionOpts),
 }
 
-pub async fn exec(opts: SubmitProposalOpts, agent: Agent) -> NnsCliResult {
+pub async fn exec(
+    opts: SubmitProposalOpts,
+    maybe_sign_payload: Option<SignPayload>,
+    env: Env,
+) -> NnsCliResult {
     let proposal_opts = opts.clone();
     match opts.subcmd {
         SubCommand::AuthorizeToSubnet(v) => {
-            authorize_to_subnet::exec(v, proposal_opts, agent.clone()).await
+            authorize_to_subnet::exec(v, proposal_opts, maybe_sign_payload, env).await
         }
-        SubCommand::Motion(v) => motion::exec(v, proposal_opts, agent.clone()).await,
+        SubCommand::Motion(v) => motion::exec(v, proposal_opts, maybe_sign_payload, env).await,
     }
 }

@@ -1,8 +1,8 @@
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
+use crate::lib::segregated_sign_send::sign::SignPayload;
 
 use clap::Clap;
-use ic_agent::Agent;
-use ic_types::Principal;
 
 mod account_id;
 mod balance;
@@ -21,9 +21,13 @@ enum SubCommand {
     Balance(balance::BalanceOpts),
 }
 
-pub async fn exec(opts: LedgerOpts, agent: Agent, sender: Principal) -> NnsCliResult {
+pub async fn exec(
+    opts: LedgerOpts,
+    maybe_sign_payload: Option<SignPayload>,
+    env: Env,
+) -> NnsCliResult {
     match opts.subcmd {
-        SubCommand::AccountId(v) => account_id::exec(v, sender).await,
-        SubCommand::Balance(v) => balance::exec(v, agent, sender).await,
+        SubCommand::AccountId(v) => account_id::exec(v, env).await,
+        SubCommand::Balance(v) => balance::exec(v, maybe_sign_payload, env).await,
     }
 }

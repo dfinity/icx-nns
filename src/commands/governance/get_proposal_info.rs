@@ -1,9 +1,9 @@
+use crate::lib::env::Env;
 use crate::lib::error::NnsCliResult;
 use crate::lib::nns_types::governance::governance_canister_id;
 
 use candid::{Decode, Encode};
 use clap::Clap;
-use ic_agent::Agent;
 use ic_nns_governance::pb::v1::ProposalInfo;
 
 const GET_PROPOSAL_INFO_METHOD: &str = "get_proposal_info";
@@ -15,8 +15,9 @@ pub struct GetProposalInfoOpts {
     id: u64,
 }
 
-pub async fn exec(opts: GetProposalInfoOpts, agent: Agent) -> NnsCliResult {
-    let result = agent
+pub async fn exec(opts: GetProposalInfoOpts, env: Env) -> NnsCliResult {
+    let result = env
+        .agent
         .query(&governance_canister_id(), GET_PROPOSAL_INFO_METHOD)
         .with_arg(Encode!(&(opts.id))?)
         .call()
