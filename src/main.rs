@@ -1,7 +1,7 @@
 use crate::lib::agent::construct_agent;
 use crate::lib::env::Env;
 use crate::lib::identity::create_identity;
-use clap::{AppSettings, Clap};
+use clap::{crate_version, AppSettings, Clap};
 
 use anyhow::anyhow;
 use tokio::runtime::Runtime;
@@ -13,7 +13,7 @@ const IC_ENDPOINT: &str = "https://ic0.app";
 
 /// A tool to interact with IC NNS.
 #[derive(Clap)]
-#[clap(name("icx-nns"), global_setting = AppSettings::ColoredHelp)]
+#[clap(name("icx-nns"), version = crate_version!(), global_setting = AppSettings::ColoredHelp)]
 pub struct Opts {
     #[clap(subcommand)]
     command: commands::Command,
