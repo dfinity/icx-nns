@@ -25,49 +25,41 @@ rust_decimal = "1.10.3"
 [dependencies.ic-agent]
 version = "0.5.0"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 features = ["reqwest"]
 
 [dependencies.ic-identity-hsm]
 version = "0.3.1"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 
 [dependencies.ic-types]
 version = "0.1.3"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 
 [dependencies.ic-utils]
 version = "0.3.1"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 
 [patch.crates-io.ic-agent]
 version = "0.5.0"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 features = ["reqwest"]
 
 [patch.crates-io.ic-identity-hsm]
 version = "0.3.1"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 
 [patch.crates-io.ic-types]
 version = "0.1.3"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
 
 [patch.crates-io.ic-utils]
 version = "0.3.1"
 git = "https://github.com/dfinity/agent-rs.git"
-branch = "main"
 rev = "01aa26cc6e481d6bda1a4402741e8eaaf7be3c66"
