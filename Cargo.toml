@@ -12,7 +12,7 @@ candid = { version = "0.6.20", features = [ "random" ] }
 clap = "3.0.0-beta.2"
 humanize-rs = "0.1.5"
 garcon = { version = "0.2", features = ["async"] }
-openssl = "0.10.32"
+openssl = "0.10.48"
 serde = { version = "1.0.101", features = ["derive"] }
 tokio = { version = "1.2.0", features = [ "fs" ] }
 ic-base-types = { git = "https://github.com/dfinity/ic", rev = "779549eccfcf61ac702dfc2ee6d76ffdc2db1f7f" }
